@@ -1,0 +1,65 @@
+# Rust build artifacts
+/target/
+Cargo.lock
+
+# Nix build results
+/result
+/result-*
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Test artifacts
+tests/assets/*.mp4
+tests/assets/*.avi
+tests/assets/*.mov
+tests/temp/
+
+# Development environment
+.env
+.env.local
+
+# Backup files
+*.bak
+*.backup
+*.tmp
+
+# FFmpeg build artifacts
+*.o
+*.a
+*.so
+*.dylib
+
+# Rust analyzer cache
+.rust-analyzer/
+
+# Coverage reports
+coverage/
+*.profraw
+
+# Benchmark results
+benchmarks/
+
+# Documentation build
+book/
+docs/build/
+
+# Temporary direnv files
+.direnv/

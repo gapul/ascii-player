@@ -1,0 +1,61 @@
+[package]
+name = "ascii-player"
+version = "0.1.0"
+edition = "2021"
+authors = ["Yuki <yuk8337@gmail.com>"]
+description = "A responsive, color-enabled ASCII video player for the terminal"
+homepage = "https://github.com/gapul/ascii-player"
+repository = "https://github.com/gapul/ascii-player"
+license = "MIT"
+keywords = ["ascii", "video", "terminal", "player", "cli"]
+categories = ["command-line-utilities", "multimedia"]
+
+[dependencies]
+# CLI argument parsing
+clap = { version = "4.4", features = ["derive"] }
+
+# Video decoding
+ffmpeg-next = "7.0"
+
+# Terminal manipulation
+crossterm = "0.27"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Async runtime (for event handling)
+tokio = { version = "1.0", features = ["full"] }
+
+# Image processing
+image = "0.24"
+
+# Logging
+log = "0.4"
+env_logger = "0.10"
+
+# Serialization (for configuration)
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Color handling
+colorgrad = "0.6"
+
+[dev-dependencies]
+tempfile = "3.8"
+assert_cmd = "2.0"
+predicates = "3.0"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.dev]
+debug = true
+overflow-checks = true
+
+[[bin]]
+name = "ascii-player"
+path = "src/main.rs"
