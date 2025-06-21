@@ -59,6 +59,10 @@ pub struct Cli {
     /// Show video information only (don't play)
     #[arg(long)]
     pub info_only: bool,
+
+    /// Render a single frame for testing (debug mode)
+    #[arg(long)]
+    pub single_frame: bool,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -84,11 +88,9 @@ impl Cli {
             return Err("Speed factor must be greater than 0".to_string());
         }
 
-        // Validate alpha threshold
-        if let Some(threshold) = self.alpha_threshold {
-            if threshold > 255 {
-                return Err("Alpha threshold must be between 0 and 255".to_string());
-            }
+        // Validate alpha threshold (u8 is always <= 255, so this check is redundant but kept for clarity)
+        if let Some(_threshold) = self.alpha_threshold {
+            // u8 is automatically bounded to 0-255, so no additional validation needed
         }
 
         // Validate terminal dimensions

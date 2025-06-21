@@ -59,10 +59,9 @@ fn test_cli_missing_file() {
 
 #[test]
 fn test_cli_invalid_speed() {
-    let video_path = create_test_video().unwrap();
-    
+    // Use existing test video instead of creating a temporary one
     let mut cmd = Command::cargo_bin("ascii-player").unwrap();
-    cmd.arg(video_path.to_str().unwrap())
+    cmd.arg("tests/assets/sample.mp4")
         .arg("--speed")
         .arg("0");
     cmd.assert()
@@ -100,6 +99,46 @@ fn test_cli_valid_options() {
 
 mod unit_tests {
     use super::*;
+    use ascii_player::cli::ColorPalette;
+    
+    // Utility function for formatting duration
+    fn format_duration(seconds: f64) -> String {
+        let total_seconds = seconds as u64;
+        let hours = total_seconds / 3600;
+        let minutes = (total_seconds % 3600) / 60;
+        let secs = total_seconds % 60;
+        
+        if hours > 0 {
+            format!("{}:{:02}:{:02}", hours, minutes, secs)
+        } else {
+            format!("{}:{:02}", minutes, secs)
+        }
+    }
+    
+    // Utility function for calculating aspect ratio
+    fn calculate_aspect_ratio(width: u32, height: u32) -> f64 {
+        width as f64 / height as f64
+    }
+    
+    // Generic clamp function
+    fn clamp<T: PartialOrd>(value: T, min: T, max: T) -> T {
+        if value < min {
+            min
+        } else if value > max {
+            max
+        } else {
+            value
+        }
+    }
+    
+    // Get ASCII chars from palette
+    fn get_ascii_chars(palette: &ColorPalette) -> &'static [char] {
+        match palette {
+            ColorPalette::Ascii => &[' ', '.', ':', '-', '=', '+', '*', '#', '%', '@'],
+            ColorPalette::Grayscale => &[' ', '░', '▒', '▓', '█'],
+            ColorPalette::Color => &[' ', '░', '▒', '▓', '█'],
+        }
+    }
     
     #[test]
     fn test_format_duration() {
@@ -212,6 +251,8 @@ mod converter_tests {
 mod renderer_tests {
     use super::*;
     use ascii_player::converter::AsciiFrame;
+    use ascii_player::renderer::{Renderer, calculate_frame_delay};
+    use std::time::Duration;
     
     fn create_test_ascii_frame() -> AsciiFrame {
         AsciiFrame {

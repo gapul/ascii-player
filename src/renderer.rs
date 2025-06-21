@@ -31,7 +31,18 @@ pub struct RenderStats {
 impl Renderer {
     /// Create a new renderer
     pub fn new(transparent_mode: bool, use_colors: bool) -> Result<Self> {
-        let (terminal_width, terminal_height) = crossterm::terminal::size()?;
+        // Try to get terminal size, fallback to default if not available
+        let (terminal_width, terminal_height) = match crossterm::terminal::size() {
+            Ok((w, h)) => {
+                debug!("Terminal size detected: {}x{}", w, h);
+                (w, h)
+            }
+            Err(e) => {
+                debug!("Failed to detect terminal size, using defaults: {}", e);
+                // Use reasonable defaults for non-terminal environments
+                (80, 24)
+            }
+        };
         
         Ok(Self {
             stdout: stdout(),
@@ -45,10 +56,33 @@ impl Renderer {
     
     /// Initialize the terminal for rendering
     pub fn init(&mut self) -> Result<()> {
-        enable_raw_mode()?;
-        execute!(self.stdout, Hide, Clear(ClearType::All))?;
-        debug!("Terminal initialized for rendering");
-        Ok(())
+        // Check if we're in a proper terminal environment
+        if !atty::is(atty::Stream::Stdout) {
+            debug!("Not running in a terminal, skipping raw mode");
+            return Ok(());
+        }
+        
+        match enable_raw_mode() {
+            Ok(()) => {
+                debug!("Raw mode enabled successfully");
+                match execute!(self.stdout, Hide, Clear(ClearType::All)) {
+                    Ok(()) => {
+                        debug!("Terminal initialized for rendering");
+                        Ok(())
+                    }
+                    Err(e) => {
+                        debug!("Failed to initialize terminal display: {}", e);
+                        // Try to disable raw mode if display init failed
+                        let _ = disable_raw_mode();
+                        Err(e.into())
+                    }
+                }
+            }
+            Err(e) => {
+                debug!("Failed to enable raw mode: {}", e);
+                Err(e.into())
+            }
+        }
     }
     
     /// Restore terminal to normal state

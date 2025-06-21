@@ -3,6 +3,14 @@ mod decoder;
 mod converter;
 mod renderer;
 
+pub mod prelude;
+
+// Re-export modules for library usage
+pub use cli::*;
+pub use decoder::*;
+pub use converter::*;
+pub use renderer::*;
+
 use cli::Cli;
 use decoder::load_video;
 use converter::{FrameConverter, ConversionConfig};
@@ -143,9 +151,65 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
+    // If single-frame mode, decode one frame and show ASCII output
+    if cli.single_frame {
+        info!("Single frame mode: testing frame decoding and conversion");
+        let mut frame_iter = load_video(&cli.file_path, cli.start_time, cli.end_time)?;
+        
+        let video_fps = frame_iter.decoder().fps();
+        let (video_width, video_height) = frame_iter.decoder().dimensions();
+        
+        println!("Video info: {}x{}, {:.2} FPS", video_width, video_height, video_fps);
+        
+        // Get first frame
+        if let Some(frame_result) = frame_iter.next() {
+            let frame = frame_result?;
+            println!("Decoded frame: {}x{}, {} bytes", frame.width, frame.height, frame.data.len());
+            
+            // Convert to ASCII with terminal size 80x24
+            let conversion_config = ConversionConfig {
+                palette: cli.palette.clone(),
+                transparent: cli.transparent,
+                alpha_threshold: cli.alpha_threshold,
+                ascii_chars: cli.get_ascii_chars().to_vec(),
+                ..Default::default()
+            };
+            let converter = FrameConverter::new(conversion_config);
+            
+            let ascii_frame = converter.convert_frame(&frame, 80, 24)?;
+            println!("ASCII frame: {}x{}, {} chars", ascii_frame.width, ascii_frame.height, ascii_frame.characters.len());
+            
+            // Print ASCII frame as text
+            println!("\nASCII Frame Output:");
+            println!("{}", "=".repeat(ascii_frame.width as usize));
+            for y in 0..ascii_frame.height {
+                for x in 0..ascii_frame.width {
+                    let index = (y * ascii_frame.width + x) as usize;
+                    if index < ascii_frame.characters.len() {
+                        print!("{}", ascii_frame.characters[index]);
+                    }
+                }
+                println!();
+            }
+            println!("{}", "=".repeat(ascii_frame.width as usize));
+            
+        } else {
+            println!("No frames found in video");
+        }
+        
+        return Ok(());
+    }
+
     // Create renderer
     let mut renderer = Renderer::new(cli.transparent, cli.use_color())?;
-    renderer.init()?;
+    
+    // Initialize renderer with error handling
+    if let Err(e) = renderer.init() {
+        warn!("Failed to initialize terminal renderer: {}", e);
+        error!("This application requires a terminal environment to run.");
+        error!("If you're testing, use --info-only flag to display video information only.");
+        return Err(e.into());
+    }
     
     // Show loading screen
     renderer.display_loading("Loading video...")?;
@@ -314,7 +378,7 @@ Press H again to hide this help."#;
         };
         
         // Create status line
-        let elapsed = playback_start.elapsed().as_secs_f64();
+        let _elapsed = playback_start.elapsed().as_secs_f64();
         let progress = if video_duration > 0.0 {
             (frame.timestamp / video_duration * 100.0).min(100.0)
         } else {

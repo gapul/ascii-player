@@ -41,6 +41,9 @@ serde_json = "1.0"
 # Color handling
 colorgrad = "0.6"
 
+# Terminal detection
+atty = "0.2"
+
 [dev-dependencies]
 tempfile = "3.8"
 assert_cmd = "2.0"

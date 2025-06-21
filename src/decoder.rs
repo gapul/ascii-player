@@ -172,8 +172,15 @@ impl VideoDecoder {
         let width = frame.width();
         let height = frame.height();
         
+        if width == 0 || height == 0 {
+            return Err(anyhow!("Invalid frame dimensions: {}x{}", width, height));
+        }
+        
         // Initialize scaler if needed
         if self.scaler.is_none() {
+            debug!("Creating scaler: {:?} {}x{} -> RGB24 {}x{}", 
+                   frame.format(), width, height, width, height);
+            
             self.scaler = Some(
                 ffmpeg::software::scaling::Context::get(
                     frame.format(),
@@ -187,10 +194,14 @@ impl VideoDecoder {
             );
         }
         
-        let mut rgb_frame = ffmpeg::frame::Video::empty();
+        // Create output frame with proper format and size
+        let mut rgb_frame = ffmpeg::frame::Video::new(ffmpeg::format::Pixel::RGB24, width, height);
+        
         if let Some(ref mut scaler) = self.scaler {
             scaler.run(frame, &mut rgb_frame)
                 .map_err(|e| anyhow!("Failed to scale frame: {}", e))?;
+        } else {
+            return Err(anyhow!("Scaler not initialized"));
         }
         
         // Calculate timestamp
@@ -205,11 +216,19 @@ impl VideoDecoder {
             self.frame_count as f64 / self.fps
         };
         
-        // Extract RGB data
-        let data = rgb_frame.data(0).to_vec();
+        // Extract RGB data safely
+        let rgb_data = rgb_frame.data(0);
+        let expected_size = (width * height * 3) as usize;
         
-        debug!("Decoded frame {}: {}x{}, timestamp: {:.3}s", 
-               self.frame_count, width, height, timestamp);
+        if rgb_data.len() < expected_size {
+            return Err(anyhow!("Insufficient RGB data: got {} bytes, expected {}", 
+                              rgb_data.len(), expected_size));
+        }
+        
+        let data = rgb_data[..expected_size].to_vec();
+        
+        debug!("Decoded frame {}: {}x{}, timestamp: {:.3}s, data_size: {}", 
+               self.frame_count, width, height, timestamp, data.len());
         
         Ok(Some(VideoFrame {
             data,
