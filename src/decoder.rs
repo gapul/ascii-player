@@ -1,7 +1,7 @@
 use ffmpeg_next as ffmpeg;
 use std::path::Path;
 use anyhow::{Result, anyhow};
-use log::{debug, warn, info};
+use log::{debug, info};
 
 /// Video decoder that extracts frames from video files
 pub struct VideoDecoder {
@@ -32,10 +32,22 @@ pub struct VideoFrame {
 impl VideoDecoder {
     /// Create a new VideoDecoder from a file path
     pub fn new(path: &Path) -> Result<Self> {
-        ffmpeg::init().map_err(|e| anyhow!("Failed to initialize FFmpeg: {}", e))?;
+        // Initialize FFmpeg with error handling
+        match ffmpeg::init() {
+            Ok(_) => debug!("FFmpeg initialized successfully"),
+            Err(e) => {
+                debug!("FFmpeg init error: {:?}", e);
+                // Continue anyway as this might not be fatal
+            }
+        }
         
+        debug!("Attempting to open video file: {}", path.display());
         let input_context = ffmpeg::format::input(&path)
-            .map_err(|e| anyhow!("Failed to open video file '{}': {}", path.display(), e))?;
+            .map_err(|e| {
+                info!("FFmpeg error details: {:?}", e);
+                anyhow!("Failed to open video file '{}': {}", path.display(), e)
+            })?;
+        debug!("Successfully opened video file");
         
         // Find the best video stream
         let stream = input_context
@@ -183,8 +195,12 @@ impl VideoDecoder {
         
         // Calculate timestamp
         let time_base = self.input_context.stream(self.stream_index).unwrap().time_base();
-        let timestamp = if frame.timestamp() != ffmpeg::ffi::AV_NOPTS_VALUE {
-            frame.timestamp() as f64 * time_base.numerator() as f64 / time_base.denominator() as f64
+        let timestamp = if let Some(ts) = frame.timestamp() {
+            if ts != ffmpeg::ffi::AV_NOPTS_VALUE {
+                ts as f64 * time_base.numerator() as f64 / time_base.denominator() as f64
+            } else {
+                self.frame_count as f64 / self.fps
+            }
         } else {
             self.frame_count as f64 / self.fps
         };

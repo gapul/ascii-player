@@ -44,9 +44,6 @@ pub enum AsciiPlayerError {
     #[error("Video decoding error: {0}")]
     VideoDecoding(#[from] ffmpeg_next::Error),
     
-    #[error("Terminal error: {0}")]
-    Terminal(#[from] crossterm::ErrorKind),
-    
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
     

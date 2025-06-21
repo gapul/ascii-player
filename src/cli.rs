@@ -29,7 +29,7 @@ pub struct Cli {
     pub width: Option<u16>,
 
     /// Set terminal height (override automatic detection)
-    #[arg(short, long)]
+    #[arg(long)]
     pub height: Option<u16>,
 
     /// Enable verbose logging
@@ -55,6 +55,10 @@ pub struct Cli {
     /// Stop playback at specific time (in seconds)
     #[arg(long)]
     pub end_time: Option<f64>,
+
+    /// Show video information only (don't play)
+    #[arg(long)]
+    pub info_only: bool,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -121,7 +125,7 @@ impl Cli {
     }
 
     /// Get effective terminal dimensions
-    pub fn get_terminal_size(&self) -> Result<(u16, u16), crossterm::ErrorKind> {
+    pub fn get_terminal_size(&self) -> Result<(u16, u16), std::io::Error> {
         match (self.width, self.height) {
             (Some(w), Some(h)) => Ok((w, h)),
             (Some(w), None) => {

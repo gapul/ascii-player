@@ -292,7 +292,10 @@ mod tests {
     use crate::decoder::VideoFrame;
     
     fn create_test_frame(width: u32, height: u32, r: u8, g: u8, b: u8) -> VideoFrame {
-        let data = vec![r, g, b; (width * height) as usize];
+        let mut data = Vec::new();
+        for _ in 0..(width * height) {
+            data.extend_from_slice(&[r, g, b]);
+        }
         VideoFrame {
             data,
             width,

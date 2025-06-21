@@ -38,7 +38,6 @@
             
             # Testing and debugging
             gdb
-            valgrind
           ];
           
           # Environment variables for Rust development

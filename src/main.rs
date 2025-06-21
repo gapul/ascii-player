@@ -3,14 +3,14 @@ mod decoder;
 mod converter;
 mod renderer;
 
-use cli::{Cli, ColorPalette};
+use cli::Cli;
 use decoder::load_video;
 use converter::{FrameConverter, ConversionConfig};
 use renderer::{Renderer, calculate_frame_delay};
 
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use log::{info, debug, error, warn};
 use std::process::Command;
 use std::time::{Duration, Instant};
@@ -125,6 +125,24 @@ async fn main() -> Result<()> {
         ..Default::default()
     };
     
+    // If info-only mode, skip terminal initialization and just get video info
+    if cli.info_only {
+        info!("Info-only mode: loading video information");
+        let frame_iter = load_video(&cli.file_path, cli.start_time, cli.end_time)?;
+        
+        let video_fps = frame_iter.decoder().fps();
+        let video_duration = frame_iter.decoder().duration();
+        let (video_width, video_height) = frame_iter.decoder().dimensions();
+        
+        println!("Video Information:");
+        println!("  File: {}", cli.file_path.display());
+        println!("  Dimensions: {}x{}", video_width, video_height);
+        println!("  Frame Rate: {:.2} FPS", video_fps);
+        println!("  Duration: {:.2} seconds", video_duration);
+        println!("  Aspect Ratio: {:.2}", video_width as f64 / video_height as f64);
+        return Ok(());
+    }
+
     // Create renderer
     let mut renderer = Renderer::new(cli.transparent, cli.use_color())?;
     renderer.init()?;
@@ -217,7 +235,7 @@ async fn main() -> Result<()> {
                             state.loop_enabled = !state.loop_enabled;
                             info!("Loop {}", if state.loop_enabled { "enabled" } else { "disabled" });
                         }
-                        KeyCode::Char('h') | KeyCode::F1 => {
+                        KeyCode::Char('h') => {
                             state.show_help = !state.show_help;
                         }
                         KeyCode::Char('r') => {
@@ -246,7 +264,7 @@ Q/ESC  - Quit
 -      - Decrease speed
 L      - Toggle loop
 R      - Restart video
-H/F1   - Toggle this help
+H      - Toggle this help
 
 Press H again to hide this help."#;
             
