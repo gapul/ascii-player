@@ -25,13 +25,20 @@ jobs:
           - os: ubuntu-latest
             deps: sudo apt-get update && sudo apt-get install -y ffmpeg libavformat-dev libavcodec-dev libavutil-dev libavfilter-dev libavdevice-dev libswscale-dev libswresample-dev pkg-config
           - os: macos-latest
-            deps: brew install ffmpeg pkg-config
+            # ffmpeg 8 dropped avfft.h which ffmpeg-sys-next 7.x still binds; stay on 7
+            deps: brew install ffmpeg@7 pkg-config
 
     steps:
     - uses: actions/checkout@v4
 
     - name: Install system dependencies
       run: ${{ matrix.deps }}
+
+    - name: Expose keg-only ffmpeg@7 to pkg-config (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        echo "PKG_CONFIG_PATH=$(brew --prefix ffmpeg@7)/lib/pkgconfig" >> "$GITHUB_ENV"
+        echo "$(brew --prefix ffmpeg@7)/bin" >> "$GITHUB_PATH"
 
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@master
@@ -146,16 +153,22 @@ jobs:
             deps: sudo apt-get update && sudo apt-get install -y ffmpeg libavformat-dev libavcodec-dev libavutil-dev libavfilter-dev libavdevice-dev libswscale-dev libswresample-dev pkg-config
           - os: macos-latest
             target: x86_64-apple-darwin
-            deps: brew install ffmpeg pkg-config
+            deps: brew install ffmpeg@7 pkg-config
           - os: macos-latest
             target: aarch64-apple-darwin
-            deps: brew install ffmpeg pkg-config
+            deps: brew install ffmpeg@7 pkg-config
 
     steps:
     - uses: actions/checkout@v4
 
     - name: Install system dependencies
       run: ${{ matrix.deps }}
+
+    - name: Expose keg-only ffmpeg@7 to pkg-config (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        echo "PKG_CONFIG_PATH=$(brew --prefix ffmpeg@7)/lib/pkgconfig" >> "$GITHUB_ENV"
+        echo "$(brew --prefix ffmpeg@7)/bin" >> "$GITHUB_PATH"
 
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable

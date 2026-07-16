@@ -24,8 +24,7 @@
             clippy
 
             # Core dependency for video processing
-            ffmpeg
-            ffmpeg-full
+            ffmpeg_7
 
             # Build dependencies
             pkg-config
@@ -42,7 +41,7 @@
           
           # Environment variables for Rust development
           RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
-          PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig:${pkgs.ffmpeg.dev}/lib/pkgconfig";
+          PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig:${pkgs.ffmpeg_7.dev}/lib/pkgconfig";
           
           shellHook = ''
             echo "🎬 ASCII Player Development Environment"
@@ -76,7 +75,7 @@
           ];
           
           buildInputs = with pkgs; [
-            ffmpeg
+            ffmpeg_7
             openssl
           ];
           

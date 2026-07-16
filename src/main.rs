@@ -79,7 +79,6 @@ struct PlaybackState {
     paused: bool,
     speed: f64,
     loop_enabled: bool,
-    quit_requested: bool,
     show_help: bool,
 }
 
@@ -89,7 +88,6 @@ impl Default for PlaybackState {
             paused: false,
             speed: 1.0,
             loop_enabled: false,
-            quit_requested: false,
             show_help: false,
         }
     }
@@ -279,12 +277,10 @@ async fn main() -> Result<()> {
                 Event::Key(key_event) => match key_event.code {
                     KeyCode::Char('q') | KeyCode::Esc => {
                         info!("Quit requested by user");
-                        state.quit_requested = true;
                         break;
                     }
                     KeyCode::Char('c') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
                         info!("Ctrl+C pressed, exiting");
-                        state.quit_requested = true;
                         break;
                     }
                     KeyCode::Char(' ') => {
@@ -452,7 +448,6 @@ mod tests {
         assert!(!state.paused);
         assert_eq!(state.speed, 1.0);
         assert!(!state.loop_enabled);
-        assert!(!state.quit_requested);
         assert!(!state.show_help);
     }
 
