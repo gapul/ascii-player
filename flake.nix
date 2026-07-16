@@ -71,6 +71,8 @@
           
           nativeBuildInputs = with pkgs; [
             pkg-config
+            # ffmpeg-sys-next generates bindings with bindgen, which needs libclang
+            rustPlatform.bindgenHook
           ];
           
           buildInputs = with pkgs; [
