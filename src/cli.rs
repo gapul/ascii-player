@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use clap::Parser;
+use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -80,7 +80,10 @@ impl Cli {
     pub fn validate(&self) -> Result<(), String> {
         // Check if file exists
         if !self.file_path.exists() {
-            return Err(format!("Video file does not exist: {}", self.file_path.display()));
+            return Err(format!(
+                "Video file does not exist: {}",
+                self.file_path.display()
+            ));
         }
 
         // Validate speed factor

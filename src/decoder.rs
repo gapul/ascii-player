@@ -1,7 +1,7 @@
+use anyhow::{anyhow, Result};
 use ffmpeg_next as ffmpeg;
-use std::path::Path;
-use anyhow::{Result, anyhow};
 use log::{debug, info};
+use std::path::Path;
 
 /// Video decoder that extracts frames from video files
 pub struct VideoDecoder {
@@ -40,34 +40,37 @@ impl VideoDecoder {
                 // Continue anyway as this might not be fatal
             }
         }
-        
+
         debug!("Attempting to open video file: {}", path.display());
-        let input_context = ffmpeg::format::input(&path)
-            .map_err(|e| {
-                info!("FFmpeg error details: {:?}", e);
-                anyhow!("Failed to open video file '{}': {}", path.display(), e)
-            })?;
+        let input_context = ffmpeg::format::input(&path).map_err(|e| {
+            info!("FFmpeg error details: {:?}", e);
+            anyhow!("Failed to open video file '{}': {}", path.display(), e)
+        })?;
         debug!("Successfully opened video file");
-        
+
         // Find the best video stream
         let stream = input_context
             .streams()
             .best(ffmpeg::media::Type::Video)
             .ok_or_else(|| anyhow!("No video stream found in file '{}'", path.display()))?;
-        
+
         let stream_index = stream.index();
-        
-        info!("Found video stream {} in file '{}'", stream_index, path.display());
-        
+
+        info!(
+            "Found video stream {} in file '{}'",
+            stream_index,
+            path.display()
+        );
+
         // Create decoder context
         let context_decoder = ffmpeg::codec::context::Context::from_parameters(stream.parameters())
             .map_err(|e| anyhow!("Failed to create codec context: {}", e))?;
-        
+
         let decoder = context_decoder
             .decoder()
             .video()
             .map_err(|e| anyhow!("Failed to create video decoder: {}", e))?;
-        
+
         // Get video metadata
         let fps = stream.avg_frame_rate();
         let fps = if fps.denominator() != 0 {
@@ -75,16 +78,22 @@ impl VideoDecoder {
         } else {
             25.0 // Default fallback FPS
         };
-        
+
         let duration = if stream.duration() != ffmpeg::ffi::AV_NOPTS_VALUE {
-            stream.duration() as f64 * stream.time_base().numerator() as f64 / stream.time_base().denominator() as f64
+            stream.duration() as f64 * stream.time_base().numerator() as f64
+                / stream.time_base().denominator() as f64
         } else {
             0.0
         };
-        
-        debug!("Video info: {}x{}, {:.2} FPS, {:.2}s duration", 
-               decoder.width(), decoder.height(), fps, duration);
-        
+
+        debug!(
+            "Video info: {}x{}, {:.2} FPS, {:.2}s duration",
+            decoder.width(),
+            decoder.height(),
+            fps,
+            duration
+        );
+
         Ok(Self {
             input_context,
             stream_index,
@@ -95,47 +104,54 @@ impl VideoDecoder {
             duration,
         })
     }
-    
+
     /// Get video FPS
     pub fn fps(&self) -> f64 {
         self.fps
     }
-    
+
     /// Get video duration in seconds
     pub fn duration(&self) -> f64 {
         self.duration
     }
-    
+
     /// Get video dimensions
     pub fn dimensions(&self) -> (u32, u32) {
         (self.decoder.width(), self.decoder.height())
     }
-    
+
     /// Seek to a specific time in seconds
     pub fn seek_to(&mut self, timestamp: f64) -> Result<()> {
-        let time_base = self.input_context.stream(self.stream_index).unwrap().time_base();
-        let timestamp_ts = (timestamp / (time_base.numerator() as f64 / time_base.denominator() as f64)) as i64;
-        
-        self.input_context.seek(timestamp_ts, ..timestamp_ts)
+        let time_base = self
+            .input_context
+            .stream(self.stream_index)
+            .unwrap()
+            .time_base();
+        let timestamp_ts =
+            (timestamp / (time_base.numerator() as f64 / time_base.denominator() as f64)) as i64;
+
+        self.input_context
+            .seek(timestamp_ts, ..timestamp_ts)
             .map_err(|e| anyhow!("Failed to seek to timestamp {}: {}", timestamp, e))?;
-        
+
         // Reset decoder state
         self.decoder.flush();
-        
+
         debug!("Seeked to timestamp: {:.2}s", timestamp);
         Ok(())
     }
-    
+
     /// Get the next frame from the video
     pub fn next_frame(&mut self) -> Result<Option<VideoFrame>> {
         let mut decoded_frame = ffmpeg::frame::Video::empty();
-        
+
         // Try to decode frames until we get one from our video stream
         for (stream, packet) in self.input_context.packets() {
             if stream.index() == self.stream_index {
-                self.decoder.send_packet(&packet)
+                self.decoder
+                    .send_packet(&packet)
                     .map_err(|e| anyhow!("Failed to send packet to decoder: {}", e))?;
-                
+
                 // Try to receive decoded frame
                 match self.decoder.receive_frame(&mut decoded_frame) {
                     Ok(()) => {
@@ -152,11 +168,12 @@ impl VideoDecoder {
                 }
             }
         }
-        
+
         // Try to flush any remaining frames
-        self.decoder.send_eof()
+        self.decoder
+            .send_eof()
             .map_err(|e| anyhow!("Failed to send EOF to decoder: {}", e))?;
-        
+
         match self.decoder.receive_frame(&mut decoded_frame) {
             Ok(()) => {
                 self.frame_count += 1;
@@ -166,21 +183,27 @@ impl VideoDecoder {
             Err(e) => Err(anyhow!("Failed to receive final frame: {}", e)),
         }
     }
-    
+
     /// Convert FFmpeg frame to RGB format
     fn convert_frame(&mut self, frame: &ffmpeg::frame::Video) -> Result<Option<VideoFrame>> {
         let width = frame.width();
         let height = frame.height();
-        
+
         if width == 0 || height == 0 {
             return Err(anyhow!("Invalid frame dimensions: {}x{}", width, height));
         }
-        
+
         // Initialize scaler if needed
         if self.scaler.is_none() {
-            debug!("Creating scaler: {:?} {}x{} -> RGB24 {}x{}", 
-                   frame.format(), width, height, width, height);
-            
+            debug!(
+                "Creating scaler: {:?} {}x{} -> RGB24 {}x{}",
+                frame.format(),
+                width,
+                height,
+                width,
+                height
+            );
+
             self.scaler = Some(
                 ffmpeg::software::scaling::Context::get(
                     frame.format(),
@@ -190,22 +213,28 @@ impl VideoDecoder {
                     width,
                     height,
                     ffmpeg::software::scaling::Flags::BILINEAR,
-                ).map_err(|e| anyhow!("Failed to create scaling context: {}", e))?
+                )
+                .map_err(|e| anyhow!("Failed to create scaling context: {}", e))?,
             );
         }
-        
+
         // Create output frame with proper format and size
         let mut rgb_frame = ffmpeg::frame::Video::new(ffmpeg::format::Pixel::RGB24, width, height);
-        
+
         if let Some(ref mut scaler) = self.scaler {
-            scaler.run(frame, &mut rgb_frame)
+            scaler
+                .run(frame, &mut rgb_frame)
                 .map_err(|e| anyhow!("Failed to scale frame: {}", e))?;
         } else {
             return Err(anyhow!("Scaler not initialized"));
         }
-        
+
         // Calculate timestamp
-        let time_base = self.input_context.stream(self.stream_index).unwrap().time_base();
+        let time_base = self
+            .input_context
+            .stream(self.stream_index)
+            .unwrap()
+            .time_base();
         let timestamp = if let Some(ts) = frame.timestamp() {
             if ts != ffmpeg::ffi::AV_NOPTS_VALUE {
                 ts as f64 * time_base.numerator() as f64 / time_base.denominator() as f64
@@ -215,21 +244,30 @@ impl VideoDecoder {
         } else {
             self.frame_count as f64 / self.fps
         };
-        
+
         // Extract RGB data safely
         let rgb_data = rgb_frame.data(0);
         let expected_size = (width * height * 3) as usize;
-        
+
         if rgb_data.len() < expected_size {
-            return Err(anyhow!("Insufficient RGB data: got {} bytes, expected {}", 
-                              rgb_data.len(), expected_size));
+            return Err(anyhow!(
+                "Insufficient RGB data: got {} bytes, expected {}",
+                rgb_data.len(),
+                expected_size
+            ));
         }
-        
+
         let data = rgb_data[..expected_size].to_vec();
-        
-        debug!("Decoded frame {}: {}x{}, timestamp: {:.3}s, data_size: {}", 
-               self.frame_count, width, height, timestamp, data.len());
-        
+
+        debug!(
+            "Decoded frame {}: {}x{}, timestamp: {:.3}s, data_size: {}",
+            self.frame_count,
+            width,
+            height,
+            timestamp,
+            data.len()
+        );
+
         Ok(Some(VideoFrame {
             data,
             width,
@@ -238,7 +276,7 @@ impl VideoDecoder {
             frame_number: self.frame_count,
         }))
     }
-    
+
     /// Get current frame count
     pub fn frame_count(&self) -> u64 {
         self.frame_count
@@ -263,7 +301,7 @@ impl FrameIterator {
             has_seeked: false,
         }
     }
-    
+
     /// Get the underlying decoder reference
     pub fn decoder(&self) -> &VideoDecoder {
         &self.decoder
@@ -272,7 +310,7 @@ impl FrameIterator {
 
 impl Iterator for FrameIterator {
     type Item = Result<VideoFrame>;
-    
+
     fn next(&mut self) -> Option<Self::Item> {
         // Seek to start time if specified and not already done
         if let Some(start_time) = self.start_time {
@@ -283,7 +321,7 @@ impl Iterator for FrameIterator {
                 self.has_seeked = true;
             }
         }
-        
+
         match self.decoder.next_frame() {
             Ok(Some(frame)) => {
                 // Check if we've reached the end time
@@ -301,7 +339,11 @@ impl Iterator for FrameIterator {
 }
 
 /// Create a frame iterator from a video file
-pub fn load_video(path: &Path, start_time: Option<f64>, end_time: Option<f64>) -> Result<FrameIterator> {
+pub fn load_video(
+    path: &Path,
+    start_time: Option<f64>,
+    end_time: Option<f64>,
+) -> Result<FrameIterator> {
     let decoder = VideoDecoder::new(path)?;
     Ok(FrameIterator::new(decoder, start_time, end_time))
 }
@@ -310,17 +352,21 @@ pub fn load_video(path: &Path, start_time: Option<f64>, end_time: Option<f64>) -
 mod tests {
     use super::*;
     use std::path::PathBuf;
-    
+
     #[test]
     fn test_decoder_creation() {
         // This test requires a sample video file
         let test_video = PathBuf::from("tests/assets/sample.mp4");
         if test_video.exists() {
             let result = VideoDecoder::new(&test_video);
-            assert!(result.is_ok(), "Failed to create decoder: {:?}", result.err());
+            assert!(
+                result.is_ok(),
+                "Failed to create decoder: {:?}",
+                result.err()
+            );
         }
     }
-    
+
     #[test]
     fn test_invalid_file() {
         let invalid_path = PathBuf::from("nonexistent.mp4");
